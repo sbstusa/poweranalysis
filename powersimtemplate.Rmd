@@ -1,0 +1,52 @@
+---
+title: A template or example of how to do power analysis via simulation
+author: JM and JB
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
+---
+
+
+
+
+
+```{r include=FALSE, cache=FALSE}
+# Some customization.  You can alter or delete as desired (if you know what you are doing).
+# knitr settings to control how R chunks work.
+
+## To make the html file do
+## render("powersimtemplate.Rmd",output_format=html_document(fig_retina=FALSE))
+## To make the pdf file do
+## render("powersimtemplate.Rmd",output_format=pdf_document())
+
+require(knitr)
+opts_chunk$set(
+  tidy=FALSE,     # display code as typed
+  size="small",    # slightly smaller font for code
+  echo=TRUE,
+  results='markup',
+  strip.white=TRUE,
+  fig.path='figs/fig',
+  cache=FALSE,
+  highlight=TRUE,
+  width.cutoff=132,
+  size='footnotesize',
+  out.width='.9\\textwidth',
+  message=FALSE,
+  comment=NA)
+```
+
+
+# Overview of Power Analysis
+
+# Nitty Gritty
+
+## Specify Blocks/Design
+
+## Specify Outcomes
+
+## Specific the outcome analysis
+
+Will you estimate an average treatment effect? Or test a sharp null of no effects? Or something else? Do it here, and make sure it makes sense.
+
+## Assess Power (given Effect Size)/Minimum Detectable Effect Size (given Power)
+
+
