@@ -1,11 +1,8 @@
 ---
-title: A template or example of how to do power analysis via simulation
-author: JM and JB
+title: Power Analysis by Simulation
+author: JM and JB^[This is a work in progress. Feel free to ask Jake or Juan Manuel for help.]
 date: '`r format(Sys.Date(), "%B %d, %Y")`'
 ---
-
-
-
 
 
 ```{r include=FALSE, cache=FALSE}
@@ -16,37 +13,179 @@ date: '`r format(Sys.Date(), "%B %d, %Y")`'
 ## render("powersimtemplate.Rmd",output_format=html_document(fig_retina=FALSE))
 ## To make the pdf file do
 ## render("powersimtemplate.Rmd",output_format=pdf_document())
-
 require(knitr)
-opts_chunk$set(
-  tidy=FALSE,     # display code as typed
-  size="small",    # slightly smaller font for code
-  echo=TRUE,
-  results='markup',
-  strip.white=TRUE,
-  fig.path='figs/fig',
-  cache=FALSE,
-  highlight=TRUE,
-  width.cutoff=132,
-  size='footnotesize',
-  out.width='.9\\textwidth',
-  message=FALSE,
-  comment=NA)
+
+## Set the defaults for the display of the R code in this document.
+opts_chunk$set(tidy=FALSE,     # display code as typed
+	       size="small",   # slightly smaller font for code
+	       echo=TRUE,      # show the code
+	       results='markup', # format the output nicely
+	       strip.white=TRUE, # get rid of extra white space
+	       cache=FALSE,      # don't save computations by default
+	       highlight=TRUE,   # use color and bold etc..
+	       width.cutoff=132, # enable a fairly wide display line
+	       size='footnotesize', # make the code use a small font
+	       out.width='.9\\textwidth', # by default any graphics will take up most of the page
+	       message=FALSE, # don't print out warnings and messages
+	       comment=NA, # print comments in the output
+	       fig.retina=FALSE 
+	       )
 ```
 
 
-# Overview of Power Analysis
+# Overview.
 
-# Nitty Gritty
+How large of an effect can we detect given our design?  In this handout, we demonstrate a simulation based approach to assessing the power of an experimental design to reject a false null hypothesis.
+
+For a nice overview of the concept of statistical power, see <http://egap.org/methods-guides/10-things-you-need-know-about-statistical-power>. That page also includes a link to a power calculator which can provide quick and reasonable answers to questions about statistical power when you have a simple design and large sample. And you can see an approach to simulation for power analysis there too.^[The direct link to the code for the simulation based approach from that page is here <http://egap.org/content/power-analysis-simulations-r>.]
+
+
+# The Ingredients
+
+Here we talk about each of the different ingredients in a power analysis. The basic idea is to create a fake study that represents your guesses about how the actual study could turn out. Later we wrap these ingredients into one function that you can use to assess different scenarios.
+
+Often you will have data that you can use here: for example, you may know something about the characteristics of units that will receive treatment, or you may already know the subgroups within which you want to ensure equal numbers of treated and control units. You will need to copy this document and edit it in that case. For now, and to keep this document self-contained, we generate fake data.
 
 ## Specify Blocks/Design
 
+How will treatment(s) be assigned? Here, just for example, I imagine that we have two groups of individuals, say, men and women, and that we will assign treatment within each group. We will eventually change $N$.
+
+```{r}
+N<-100
+female<-rep(c("M","F"),c(ceiling(N/3),N-(ceiling(N/3))))
+stopifnot(length(female)==N) ## we should have N units total
+stopifnot(all( (table(female) %% 2)==0) ) ## we should have exactly half female and half male
+```
+
+Within each block of our imaginary design, we plan to assign half of the observations to treatment and half to control with equal probability.
+
+
+```{r}
+dir.create("libraries")
+.libPaths("libraries") ## make the default place for libraries the local one
+## install.packages(c("hexbin","xtable","svd","SparseM","abind"))
+## download.file("https://github.com/markmfredrickson/RItools/releases/download/rand-dist-v1.0/RItools_0.1-12.tar.gz",destfile="RItools_0.1-12.tar.gz")
+install.packages("RItools_0.1-13.tar.gz")
+```
+
+```{r}
+library(RItools)
+
+Z<-unsplit(lapply(split(rep(NA,N),female),function(b){ sample(rep(c(1,0),round(length(b)/2))) }),female)
+
+blockRandomSampler<-function(z,b){
+  function(samples){
+    zs<-replicate(samples, unsplit(lapply(split(z,b),function(theb){ sample(rep(c(1,0),round(length(theb)/2))) }),b))
+    weight<-1
+    return(list(weight = weight, samples = zs))
+  }
+}
+
+treatmentAssigner<-blockRandomSampler(z=Z,b=female)
+
+Zs<-treatmentAssigner(10)$samples
+table(Z,female)
+apply(Zs,2,function(z){ table(z,female) })
+```
+
 ## Specify Outcomes
 
-## Specific the outcome analysis
+What kind of outcomes do you plan to measure? If you have a version of the outcomes already measured load them here. The key here is to describe the outcome variable as it would look in the control group. Here I'm using a binary outcome that is correlated with gender.
 
-Will you estimate an average treatment effect? Or test a sharp null of no effects? Or something else? Do it here, and make sure it makes sense.
+```{r}
+
+y0<-rbinom(N,prob=c(.4,.8)[as.numeric(female=="F")+1],size=1)
+tapply(y0,female,mean)
+
+```
+
+## What kind of effect do you anticipate?
+
+Here is a simple effect the treatment raises every one by 2:
+
+```{r}
+y1<-y0+2
+Y<- Z*y1 + (1-Z)*y0
+femaleF<-factor(female)
+dat<-data.frame(Z=Z,Y=Y,femaleF=femaleF)
+```
+
+## Specify the outcome analysis
+
+Will you estimate an average treatment effect? Or test a sharp null of no effects? Or something else? Do it here, and make sure it makes sense. (Average Treatment Effect is a difference of proportions with binary data.)
+
+### Estimation
+
+If you want to estimate an average treatment effect (ATE), but you have unequal
+block sizes, how should you *define* the weighted version of the ATE that you
+want? There are two options (1) weighting only by the size of the block or (2)
+weighting by both the size of the block and the proportion treated-vs-control
+in each block. This last weighting is called "harmonic mean weighting" and it
+is the default when you use OLS with fixed effects for blocks (or when you
+block-align or block-mean-center the outcome and the treatment assignment).
+
+
+```{r eval=FALSE}
+data(nuclearplants)
+xb<-xBalance(pr~t1+strata(ptF),data=nuclearplants,report="all")
+xb$results[,"adj.diff",]
+
+unadj<-with(nuclearplants,mean(t1[pr==1])-mean(t1[pr==0]))
+
+res_b<-with(nuclearplants,mapply(function(y,z){
+				   c( T=mean(y[z==1]), C=mean(y[z==0]) )
+}, y=split(t1,ptF), z=split(pr,ptF)))
+
+trtavg<-mean(nuclearplants$t1[nuclearplants$pr==1])
+ctlavg<-mean(nuclearplants$t1[nuclearplants$pr==0])
+
+
+nb<-table(nuclearplants$pt)
+ntrtb<-with(nuclearplants,sapply(split(pr,pt),function(x){ sum(x) }))
+
+sum(res_b*(ntrtb/nb))
+
+sum(res_b*(ntrtb/sum(ntrtb)))
+
+
+```
+
+```{r}
+
+res_b<-with(dat,mapply(function(y,z){ mean(y[z==1])-mean(y[z==0]) }, y=split(Y,femaleF), z=split(Z,femaleF)))
+nb<-table(femaleF)
+weighted.mean(res_b,weights=nb)
+
+## A simple estimate of the average treatment effect using a harmonic weighting scheme for unequal block sizes
+ate<-lm(Y~Z+femaleF,data=dat)
+
+## A version that does not rely on large-sample assumptions
+nullp<-RItest(y=Y,z=Z,test.stat=mean.difference,sample=treatmentAssigner,samples=5000)
+
+## A version that approximates the previous version with a Normal approximation
+xb1<-xBalance(Z~Y+strata(femaleF),report="all",data=dat)
+nullp2<-xb1$results[,"p",]
+ate2<-xb1$results[,"adj.diff",]
+xb1$results[,"adj.diff","femaleF"]
+
+
+```
+
+## Assess Validity of the Tests or Unbiasedness of the Estimation
+
+
 
 ## Assess Power (given Effect Size)/Minimum Detectable Effect Size (given Power)
 
+If we test the "truth" then we can assess the validity of the tests and/or unbiasedness of the estimation method.
+
+```{r}
+
+newY<-y0 ## make truth zero
+Zs<-treatmentAssigner(1000)
+ALTS<-sort(unique(c(0,seq(-3,3,length=100))))
+
+
+
+```
 
