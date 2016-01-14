@@ -39,6 +39,8 @@ How large of an effect can we detect given our design?  In this handout, we demo
 
 For a nice overview of the concept of statistical power, see <http://egap.org/methods-guides/10-things-you-need-know-about-statistical-power>. That page also includes a link to a power calculator which can provide quick and reasonable answers to questions about statistical power when you have a simple design and large sample. And you can see an approach to simulation for power analysis there too.^[The direct link to the code for the simulation based approach from that page is here <http://egap.org/content/power-analysis-simulations-r>.]
 
+Right now, this document does not do any power analysis for a cluster-randomized design. We plan to add this. Meanwhile, you can look at this <http://egap.org/methods-guides/10-things-you-need-know-about-cluster-randomization> method guide.
+
 
 # The Ingredients
 
@@ -48,7 +50,7 @@ Often you will have data that you can use here: for example, you may know someth
 
 ## Specify Blocks/Design
 
-How will treatment(s) be assigned? Here, just for example, I imagine that we have two groups of individuals, say, men and women, and that we will assign treatment within each group. We will eventually change $N$.
+How will treatment(s) be assigned? Here, just for example, I imagine that we have two groups of individuals, say, men and women, and that we will assign treatment within each group. We will eventually wrap all of these steps together into a function that we can use to assess power/minimum detectable effect given changes in design (such as changes in $N$, changes in blocking structure, etc..).
 
 ```{r}
 N<-100
@@ -71,32 +73,41 @@ install.packages("RItools_0.1-13.tar.gz")
 ```{r}
 library(RItools)
 
-Z<-unsplit(lapply(split(rep(NA,N),female),function(b){ sample(rep(c(1,0),round(length(b)/2))) }),female)
 
+## This is a function-maker that will allow us to repeat the experiment.
 blockRandomSampler<-function(z,b){
-  function(samples){
+  function(samples){ ## this function assigned treatment within blocks
     zs<-replicate(samples, unsplit(lapply(split(z,b),function(theb){ sample(rep(c(1,0),round(length(theb)/2))) }),b))
-    weight<-1
+    weight<-1 ## this is only useful later
     return(list(weight = weight, samples = zs))
   }
 }
 
+## Setup the treatment assignment function using one assignment vector (Z)
+set.seed(12345)
+Z<-unsplit(lapply(split(rep(NA,N),female),function(b){ sample(rep(c(1,0),round(length(b)/2))) }),female)
 treatmentAssigner<-blockRandomSampler(z=Z,b=female)
 
+## produce 10 different treatment assignments. Each should have the same number of men, women, treated and controls
 Zs<-treatmentAssigner(10)$samples
-table(Z,female)
-apply(Zs,2,function(z){ table(z,female) })
+tmptab<-table(Z,female)
+print(tmptab)
+tmp<-apply(Zs,2,function(z){ table(z,female) })
+stopifnot(all(tmp[4,]==tmptab[1,2]))
+stopifnot(all(tmp[1,]==tmptab[1,1]))
+
 ```
 
 ## Specify Outcomes
 
-What kind of outcomes do you plan to measure? If you have a version of the outcomes already measured load them here. The key here is to describe the outcome variable as it would look in the control group. Here I'm using a binary outcome that is correlated with gender.
+What kind of outcomes do you plan to measure? If you have a version of the outcomes already measured load them here. The key here is to describe the outcome variable as it would look in the control group. Here I'm using a continuous outcome that is correlated with gender.
 
 ```{r}
-
-y0<-rbinom(N,prob=c(.4,.8)[as.numeric(female=="F")+1],size=1)
+## This next is a binary outcome that is correlated with gender.
+### y0<-rbinom(N,prob=c(.4,.8)[as.numeric(female=="F")+1],size=1)
+y0<-ifelse(female=="F",runif(sum(female=="F"),min=0, max=10),
+	   runif(sum(female!="F"),min=2,max=12))
 tapply(y0,female,mean)
-
 ```
 
 ## What kind of effect do you anticipate?
@@ -105,18 +116,30 @@ Here is a simple effect the treatment raises every one by 2:
 
 ```{r}
 y1<-y0+2
+````
+
+What outcome to we see? The treatment assignment chooses whether we see the potential outcome to control, $y_0$, or treatment, $y_1$.
+
+```{r}
 Y<- Z*y1 + (1-Z)*y0
+```
+
+Create a new dataset.
+
+```{r}
 femaleF<-factor(female)
 dat<-data.frame(Z=Z,Y=Y,femaleF=femaleF)
 ```
 
 ## Specify the outcome analysis
 
-Will you estimate an average treatment effect? Or test a sharp null of no effects? Or something else? Do it here, and make sure it makes sense. (Average Treatment Effect is a difference of proportions with binary data.)
+Will you estimate an average treatment effect? Or test a sharp null hypothesis of no effects? Or something else? Do it here, and make sure it makes sense.
 
 ### Estimation
 
-If you want to estimate an average treatment effect (ATE), but you have unequal
+If you want to estimate an average treatment effect (ATE) and the 
+
+but you have unequal
 block sizes, how should you *define* the weighted version of the ATE that you
 want? There are two options (1) weighting only by the size of the block or (2)
 weighting by both the size of the block and the proportion treated-vs-control
@@ -188,4 +211,9 @@ ALTS<-sort(unique(c(0,seq(-3,3,length=100))))
 
 
 ```
+
+
+## What to do if you want to block on many covariates? Or if you want to create pairs based on one covariate?
+
+Try the `blockTools` package in R, especially the non-bipartite matching option.
 
