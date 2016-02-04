@@ -28,7 +28,7 @@ opts_chunk$set(tidy=FALSE,     # display code as typed
 	       out.width='.9\\textwidth', # by default any graphics will take up most of the page
 	       message=FALSE, # don't print out warnings and messages
 	       comment=NA, # print comments in the output
-	       fig.retina=FALSE 
+	       fig.retina=FALSE
 	       )
 ```
 
@@ -135,9 +135,16 @@ dat<-data.frame(Z=Z,Y=Y,femaleF=femaleF)
 
 Will you estimate an average treatment effect? Or test a sharp null hypothesis of no effects? Or something else? Do it here, and make sure it makes sense.
 
+The idea of statistical power requires testing, by the way. So, even if your focus is on estimation, you'll need to have some procedure for creating a confidence interval or $p$-value from a hypothesis test in order to talk about power or minimal detectable effects.
+
+### Testing
+
+The simplest 
+
+
 ### Estimation
 
-If you want to estimate an average treatment effect (ATE) and the 
+If you want to estimate an average treatment effect (ATE) and the
 
 but you have unequal
 block sizes, how should you *define* the weighted version of the ATE that you
