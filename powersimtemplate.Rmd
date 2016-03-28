@@ -144,7 +144,7 @@ A minimally detectable effect (MDE) is the smallest treatment effect that would 
 
 ```{r}
 
-nsims <- 10
+nsims <- 1000
 newZs <- treatmentAssigner(nsims)$samples
 
 ## Here using a large sample hypothesis testing approach
@@ -164,12 +164,20 @@ testH <- function(H,Z,y0,b=NULL){
 testH(H=1,Z=newZs[,1],y0=y0,b=dat$femaleF)
 ## testH(H=1,Z=newZs[,1],y0=y0)
 
-alts <- sort(unique(c(0,seq(-3,3,length=10))))
+alts <- sort(unique(c(0,seq(-1.5,1.5,length=100))))
 
-res <- sapply(alts,function(a){
+## A non-parallel approach
+## res <- sapply(alts,function(a){
+##                 resa<-sapply(1:nsims,function(i){
+##                          testH(H=a,Z=newZs[,i],y0=y0,b=dat$femaleF) })
+##                 mean(resa <= .05 ) })
+## names(res) <- alts
+
+library(parallel)
+res <- simplify2array(mclapply(alts,function(a){
                 resa<-sapply(1:nsims,function(i){
                          testH(H=a,Z=newZs[,i],y0=y0,b=dat$femaleF) })
-                mean(resa <= .05 ) })
+                mean(resa <= .05 ) }))
 names(res) <- alts
 
 res
