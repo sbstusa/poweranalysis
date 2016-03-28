@@ -67,12 +67,13 @@ dir.create("libraries")
 .libPaths("libraries") ## make the default place for libraries the local one
 ## install.packages(c("hexbin","xtable","svd","SparseM","abind"))
 ## download.file("https://github.com/markmfredrickson/RItools/releases/download/rand-dist-v1.0/RItools_0.1-12.tar.gz",destfile="RItools_0.1-12.tar.gz")
-install.packages("RItools_0.1-13.tar.gz")
+## install.packages("RItools_0.1-13.tar.gz")
+library(devtools)
+install_github("markmfredrickson/RItools@randomization-distribution") ## use @clusters if cluster randomized trial
 ```
 
 ```{r}
 library(RItools)
-
 
 ## This is a function-maker that will allow us to repeat the experiment.
 blockRandomSampler<-function(z,b){
@@ -112,7 +113,7 @@ tapply(y0,female,mean)
 
 ## What kind of effect do you anticipate?
 
-Here is a simple effect the treatment raises every one by 2:
+Here is a simple effect in which the treatment raises every control value by 2:
 
 ```{r}
 y1<-y0+2
@@ -139,7 +140,41 @@ The idea of statistical power requires testing, by the way. So, even if your foc
 
 ### Testing
 
-The simplest 
+A minimally detectable effect (MDE) is the smallest treatment effect that would be detectable with a statistical power of .8 at some $\alpha$ (mostly $\alpha=.05$). How to assess this? We can assess power by recording how often a test rejects a false null hypothesis. Usually, we set the truth to be zero, and test hypotheses that diverge from zero. If the truth is zero, then a well operating test should reject the truth no more than $\alpha$ of the simulations. And a powerful test should reject the false hypotheses quite often --- and those hypotheses should be more and more frequently rejected as they diverge from the truth.
+
+```{r}
+
+nsims <- 10
+newZs <- treatmentAssigner(nsims)$samples
+
+## Here using a large sample hypothesis testing approach
+## This is a very simple function, no covariates, assumming a constant additive effect
+testH <- function(H,Z,y0,b=NULL){
+  y1 <- y0 + H
+  Y <- Z*y1 + (1-Z)*y0
+  if(is.null(b)){ 
+    xb1 <- xBalance(Z~Y,data=data.frame(Z=Z,Y=Y),report="chisquare.test")
+    return(xb1$overall["Unstrat","p.value"])
+  } else {
+    xb1 <- xBalance(Z~Y+strata(b),data=data.frame(Z=Z,Y=Y,b=b),report="chisquare.test")
+    return(xb1$overall["b","p.value"])
+  }
+}
+
+testH(H=1,Z=newZs[,1],y0=y0,b=dat$femaleF)
+## testH(H=1,Z=newZs[,1],y0=y0)
+
+alts <- sort(unique(c(0,seq(-3,3,length=10))))
+
+res <- sapply(alts,function(a){
+                resa<-sapply(1:nsims,function(i){
+                         testH(H=a,Z=newZs[,i],y0=y0,b=dat$femaleF) })
+                mean(resa <= .05 ) })
+
+
+
+
+```
 
 
 ### Estimation
