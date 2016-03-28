@@ -170,9 +170,9 @@ res <- sapply(alts,function(a){
                 resa<-sapply(1:nsims,function(i){
                          testH(H=a,Z=newZs[,i],y0=y0,b=dat$femaleF) })
                 mean(resa <= .05 ) })
+names(res) <- alts
 
-
-
+res
 
 ```
 
