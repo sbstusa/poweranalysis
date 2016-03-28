@@ -1,0 +1,85 @@
+
+JUNK BELOW
+
+### Estimation
+
+If you want to estimate an average treatment effect (ATE) and the
+
+but you have unequal
+block sizes, how should you *define* the weighted version of the ATE that you
+want? There are two options (1) weighting only by the size of the block or (2)
+weighting by both the size of the block and the proportion treated-vs-control
+in each block. This last weighting is called "harmonic mean weighting" and it
+is the default when you use OLS with fixed effects for blocks (or when you
+block-align or block-mean-center the outcome and the treatment assignment).
+
+
+```{r eval=FALSE}
+data(nuclearplants)
+xb<-xBalance(pr~t1+strata(ptF),data=nuclearplants,report="all")
+xb$results[,"adj.diff",]
+
+unadj<-with(nuclearplants,mean(t1[pr==1])-mean(t1[pr==0]))
+
+res_b<-with(nuclearplants,mapply(function(y,z){
+				   c( T=mean(y[z==1]), C=mean(y[z==0]) )
+}, y=split(t1,ptF), z=split(pr,ptF)))
+
+trtavg<-mean(nuclearplants$t1[nuclearplants$pr==1])
+ctlavg<-mean(nuclearplants$t1[nuclearplants$pr==0])
+
+
+nb<-table(nuclearplants$pt)
+ntrtb<-with(nuclearplants,sapply(split(pr,pt),function(x){ sum(x) }))
+
+sum(res_b*(ntrtb/nb))
+
+sum(res_b*(ntrtb/sum(ntrtb)))
+
+
+```
+
+```{r}
+
+res_b<-with(dat,mapply(function(y,z){ mean(y[z==1])-mean(y[z==0]) }, y=split(Y,femaleF), z=split(Z,femaleF)))
+nb<-table(femaleF)
+weighted.mean(res_b,weights=nb)
+
+## A simple estimate of the average treatment effect using a harmonic weighting scheme for unequal block sizes
+ate<-lm(Y~Z+femaleF,data=dat)
+
+## A version that does not rely on large-sample assumptions
+nullp<-RItest(y=Y,z=Z,test.stat=mean.difference,sample=treatmentAssigner,samples=5000)
+
+## A version that approximates the previous version with a Normal approximation
+xb1<-xBalance(Z~Y+strata(femaleF),report="all",data=dat)
+nullp2<-xb1$results[,"p",]
+ate2<-xb1$results[,"adj.diff",]
+xb1$results[,"adj.diff","femaleF"]
+
+
+```
+
+## Assess Validity of the Tests or Unbiasedness of the Estimation
+
+
+
+## Assess Power (given Effect Size)/Minimum Detectable Effect Size (given Power)
+
+If we test the "truth" then we can assess the validity of the tests and/or unbiasedness of the estimation method.
+
+```{r}
+
+newY<-y0 ## make truth zero
+Zs<-treatmentAssigner(1000)
+ALTS<-sort(unique(c(0,seq(-3,3,length=100))))
+
+
+
+```
+
+
+## What to do if you want to block on many covariates? Or if you want to create pairs based on one covariate?
+
+Try the `blockTools` package in R, especially the non-bipartite matching option.
+
